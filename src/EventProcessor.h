@@ -1,12 +1,10 @@
 #ifndef EVENT_PROCESSOR_H
 #define EVENT_PROCESSOR_H
 
-#pragma once
-#include <RE/Skyrim.h>
-#include <SKSE/SKSE.h>
+#include <unordered_map>
 
-#include "Utility.h"
-
+#include "RE/Skyrim.h"
+#include "SKSE/SKSE.h"
 
 class EventProcessor : public RE::BSTEventSink<RE::InputEvent*>,
                        public RE::BSTEventSink<RE::MenuOpenCloseEvent> {
@@ -22,7 +20,6 @@ public:
                                           RE::BSTEventSource<RE::MenuOpenCloseEvent>*) override;
 };
 
-void LogTitleListEntries(const RE::GFxValue& titleList);
 void GetInGameDate();
 
 #endif  // EVENT_PROCESSOR_H

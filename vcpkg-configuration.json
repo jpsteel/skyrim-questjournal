@@ -2,7 +2,7 @@
   "default-registry": {
     "kind": "git",
     "repository": "https://github.com/microsoft/vcpkg.git",
-    "baseline": "7a57b42f959ad138a5283477fe2e6c97a7cb852f"
+    "baseline": "d5ec528843d29e3a52d745a64b469f810b2cedbf"
   },
   "registries": [
     {
@@ -10,9 +10,16 @@
       "repository": "https://gitlab.com/colorglass/vcpkg-colorglass",
       "baseline": "eb2f2bd143b8f7c52b57ef5a822163b56f7be7d6",
       "packages": [
-        "commonlibsse-ng",
-        "commonlibsse-ng-flatrim",
         "bethesda-skyrim-scripts",
+        "commonlibsse",
+        "commonlibsse-ng",
+        "commonlibsse-ng-ae",
+        "commonlibsse-ng-flatrim",
+        "commonlibsse-ng-prebuilt",
+        "commonlibsse-ng-se",
+        "commonlibsse-ng-vr",
+        "commonlibsse-po3-ae",
+        "commonlibsse-po3-se",
         "script-extender-common",
         "skse"
       ]

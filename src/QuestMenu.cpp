@@ -23,12 +23,13 @@ namespace Scaleform {
             logger->Release();
         });
 
-        inputContext = Context::kMenuMode;
-        depthPriority = 3;
+        inputContext = Context::kJournal;
+        depthPriority = 5;
         menuFlags.set(RE::UI_MENU_FLAGS::kPausesGame, RE::UI_MENU_FLAGS::kDisablePauseMenu,
                       RE::UI_MENU_FLAGS::kUsesBlurredBackground, RE::UI_MENU_FLAGS::kModal,
-                      RE::UI_MENU_FLAGS::kUsesMenuContext, RE::UI_MENU_FLAGS::kTopmostRenderedMenu,
-                      RE::UI_MENU_FLAGS::kUsesMovementToDirection);
+                      RE::UI_MENU_FLAGS::kTopmostRenderedMenu, RE::UI_MENU_FLAGS::kUsesMenuContext,
+                      RE::UI_MENU_FLAGS::kUsesMovementToDirection, RE::UI_MENU_FLAGS::kFreezeFrameBackground,
+                      RE::UI_MENU_FLAGS::kRequiresUpdate, RE::UI_MENU_FLAGS::kUpdateUsesCursor);
 
         if (!RE::BSInputDeviceManager::GetSingleton()->IsGamepadEnabled()) {
             menuFlags |= RE::UI_MENU_FLAGS::kUsesCursor;
@@ -132,13 +133,20 @@ namespace Scaleform {
 
     void QuestMenu::ShowQuestOnMap(const RE::FxDelegateArgs& a_params) {
         assert(a_params.GetArgCount() == 1); 
-        assert(a_params[0].IsString());
+        assert(a_params[0].IsNumber());
+
+        questTargetID = static_cast<uint32_t>(a_params[0].GetNumber());
 
         QuestMenu::Hide();
-        auto uiMessageQueue = RE::UIMessageQueue::GetSingleton();
-        if (uiMessageQueue) {
-            uiMessageQueue->AddMessage(RE::MapMenu::MENU_NAME, RE::UI_MESSAGE_TYPE::kShow, nullptr);
-        }
+        showOnMapStatus = true;
+        ThisFunctionMightOpenIt(false);
+    }
+
+    //The Miracle. My eternal thanks to shad0wshayd3, whoever you are may you live a long and happy life
+    void QuestMenu::ThisFunctionMightOpenIt(bool a_thisCanBeTrueOrFalseButIdoNotKnowWhatThatDoes) {
+        using func_t = decltype(&ThisFunctionMightOpenIt);
+        REL::Relocation<func_t> func{RELOCATION_ID(52428, 53327)};
+        return func(a_thisCanBeTrueOrFalseButIdoNotKnowWhatThatDoes);
     }
 
     std::vector<QuestMenu::QuestData> QuestMenu::GetRunningQuests() {

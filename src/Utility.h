@@ -19,5 +19,9 @@ RE::FormID StringToFormID(const std::string& formIDStr);
 RE::TESQuest* FindQuestByFormIDString(const std::string& formIDStr);
 void ListActiveQuestFlags(RE::TESQuest* quest);
 std::string ConcatenateViewedQuests(const std::unordered_set<std::string>& quests);
+void SetINIValue(const char* settingName, float value);
+void GetINIValue(const char* settingName);
+void LogActiveInputHandlers();
+void LogTitleListEntries(const RE::GFxValue& titleList);
 
 #endif  // UTILITY_H

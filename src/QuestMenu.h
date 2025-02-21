@@ -12,6 +12,8 @@
 namespace Scaleform {
 
     extern bool knotworkStatus;
+    extern bool showOnMapStatus;
+    extern uint32_t questTargetID;
 
     class QuestMenu: RE::IMenu {
     public:
@@ -45,6 +47,7 @@ namespace Scaleform {
         static std::vector<Scaleform::QuestMenu::QuestObjective> GetQuestObjectives(RE::TESQuest* a_quest);
         static bool HasObjective(RE::TESQuest* a_quest);
         static bool HasObjectiveDisplayed(RE::TESQuest* a_quest);
+        static void ThisFunctionMightOpenIt(bool a_thisCanBeTrueOrFalseButIdoNotKnowWhatThatDoes);
 
         static constexpr std::string_view Name();
 

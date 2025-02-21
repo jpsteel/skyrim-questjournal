@@ -5,10 +5,12 @@
 #include "Serialization.h"
 
 RE::GFxValue entryList;
-RE::GFxValue currentTab;
 std::string lastQuestFormID; 
 std::string dt;
 bool hideCompletedState;
+bool Scaleform::showOnMapStatus;
+bool journalHotkey;
+uint32_t Scaleform::questTargetID;
 
 RE::BSEventNotifyControl EventProcessor::ProcessEvent(const RE::MenuOpenCloseEvent* event,
                                                       RE::BSTEventSource<RE::MenuOpenCloseEvent>*) {
@@ -17,24 +19,55 @@ RE::BSEventNotifyControl EventProcessor::ProcessEvent(const RE::MenuOpenCloseEve
     }
     if (event->opening) {
         auto ui = RE::UI::GetSingleton();
-        if (event->menuName == RE::JournalMenu::MENU_NAME) { 
-            if (auto menu = ui->GetMenu(RE::JournalMenu::MENU_NAME); menu) {
-                menu->uiMovie->GetVariable(&currentTab, "_root.QuestJournalFader.Menu_mc.iCurrentTab");
-                if (auto journal = ui->GetMenu(RE::JournalMenu::MENU_NAME); journal) {
+        if (event->menuName == RE::JournalMenu::MENU_NAME) {
+            if (auto journal = ui->GetMenu(RE::JournalMenu::MENU_NAME); journal) {
+                if (Scaleform::showOnMapStatus) {
+                    std::array<RE::GFxValue, 1> targetID;
+                    targetID[0] = Scaleform::questTargetID;
+                    logger::info("Showing questTargetID {} on Map.", Scaleform::questTargetID);
+                    journal->uiMovie->Invoke("_root.QuestJournalFader.Menu_mc.QuestsFader.Page_mc.QJO_ShowOnMap",
+                                             nullptr, targetID.data(), targetID.size());
+                    Scaleform::showOnMapStatus = false;
+                } else {
                     RE::GFxValue titleList;
                     entryList = RE::GFxValue();
-                    journal->uiMovie->GetVariable(&titleList, 
-                                                "_root.QuestJournalFader.Menu_mc.QuestsFader.Page_mc.TitleList");
+                    journal->uiMovie->Invoke("_root.QuestJournalFader.Menu_mc.QuestsFader.Page_mc.QJO_LoadQuests",
+                                                nullptr, nullptr, 0);
+                    journal->uiMovie->GetVariable(&titleList,
+                                                    "_root.QuestJournalFader.Menu_mc.QuestsFader.Page_mc.TitleList");
                     if (titleList.HasMember("entryList")) {
                         logger::info("Retrieving quests data");
                         titleList.GetMember("entryList", &entryList);
                     }
-                } else {
-                    return RE::BSEventNotifyControl::kContinue;
+
+                    if (ui->IsMenuOpen(RE::MapMenu::MENU_NAME)) {
+                        journal->uiMovie->Invoke("_root.QuestJournalFader.Menu_mc.QuestsFader.Page_mc.QJO_EndPage",
+                                                 nullptr, nullptr, 0);
+                    }
+                    if (journalHotkey && !RE::BSInputDeviceManager::GetSingleton()->IsGamepadEnabled()) {
+                        journal->uiMovie->Invoke("_root.QuestJournalFader.Menu_mc.QuestsFader.Page_mc.QJO_EndPage",
+                                                 nullptr, nullptr, 0);
+                        journalHotkey = false;
+                    } else if (journalHotkey && RE::BSInputDeviceManager::GetSingleton()->IsGamepadEnabled()) {
+                        std::array<RE::GFxValue, 2> switchArgs;
+                        switchArgs[0] = 2;
+                        switchArgs[1] = true;
+                        journal->uiMovie->Invoke("_root.QuestJournalFader.Menu_mc.SwitchPageToFront", nullptr,
+                                                 switchArgs.data(), switchArgs.size());
+                        journalHotkey = false;
+                    }
                 }
+            } else {
+                return RE::BSEventNotifyControl::kContinue;
             }
         } else if (event->menuName == Scaleform::QuestMenu::MENU_NAME) {
             if (auto menu = ui->GetMenu(Scaleform::QuestMenu::MENU_NAME); menu) {
+                if (ui->IsMenuOpen(RE::CursorMenu::MENU_NAME)) {
+                    auto uiMessageQueue = RE::UIMessageQueue::GetSingleton();
+                    if (uiMessageQueue) {
+                        uiMessageQueue->AddMessage(RE::CursorMenu::MENU_NAME, RE::UI_MESSAGE_TYPE::kHide, nullptr);
+                    }
+                }
                 logger::info("Sending quests list");
                 std::array<RE::GFxValue, 4> configArgs;
                 std::array<RE::GFxValue, 3> headerInfo;
@@ -76,11 +109,14 @@ RE::BSEventNotifyControl EventProcessor::ProcessEvent(const RE::MenuOpenCloseEve
                                       headerInfo.size());
                 menu->uiMovie->Invoke("_root.QuestJournal_mc.SetGamepad", nullptr, gamepad.data(), gamepad.size());
             }
-        } else if (event->menuName == RE::MapMenu::MENU_NAME) {
-            if (auto menu = ui->GetMenu(RE::MapMenu::MENU_NAME); menu) {
-                logger::info("Map menu open!");
+
+            if (ui->IsMenuOpen(RE::MapMenu::MENU_NAME)) {
+                SetINIValue("fMaxMarkerSelectionDist:MapMenu", 0.0);
             }
         }
+    }
+    else if (event->menuName == Scaleform::QuestMenu::MENU_NAME) {
+        SetINIValue("fMaxMarkerSelectionDist:MapMenu", 0.003);
     }
 
     return RE::BSEventNotifyControl::kContinue;
@@ -93,6 +129,7 @@ RE::BSEventNotifyControl EventProcessor::ProcessEvent(RE::InputEvent* const* eve
     }
 
     auto* event = *eventPtr;
+
     if (event->eventType == RE::INPUT_EVENT_TYPE::kButton) {
         auto* buttonEvent = event->AsButtonEvent();
         auto dxScanCode = buttonEvent->GetIDCode();
@@ -129,136 +166,42 @@ RE::BSEventNotifyControl EventProcessor::ProcessEvent(RE::InputEvent* const* eve
                     }
                     Scaleform::QuestMenu::Hide();
                     return RE::BSEventNotifyControl::kContinue;
+                } else if (buttonEvent->QUserEvent() == userEvent->journal) {
+                    journalHotkey = true;
+                }
+            //gamepad Y returns the dx code 32768 for some reason
+            } else if (dxScanCode == 50 || dxScanCode == 279 || dxScanCode == 32768) {
+                if (ui->IsMenuOpen(Scaleform::QuestMenu::MENU_NAME)) {
+                    if (auto menu = ui->GetMenu(Scaleform::QuestMenu::MENU_NAME); menu) {
+                        logger::info("Saving last quest displayed.");
+                        RE::GFxValue lastQuest1;
+                        RE::GFxValue lastQuest2;
+                        menu->uiMovie->GetVariable(&lastQuest1, "_root.QuestJournal_mc.currentQuest");
+                        if (lastQuest1.HasMember("formID")) {
+                            lastQuest1.GetMember("formID", &lastQuest2);
+                            lastQuestFormID = lastQuest2.GetString();
+                            logger::info("Last displayed quest: {}", lastQuestFormID);
+                        }
+                        logger::info("Saving viewed quests.");
+                        RE::GFxValue viewedQuestsList;
+                        menu->uiMovie->GetVariable(&viewedQuestsList, "_root.QuestJournal_mc.aViewedQuests");
+                        for (std::uint32_t i = 0; i < viewedQuestsList.GetArraySize(); ++i) {
+                            RE::GFxValue viewedEntry;
+                            viewedQuestsList.GetElement(i, &viewedEntry);
+                            Serialization::ViewedQuests.insert(viewedEntry.GetString());
+                        }
+                        logger::info("Saving Hide Completed state.");
+                        RE::GFxValue hideCompletedQuests;
+                        menu->uiMovie->GetVariable(&hideCompletedQuests, "_root.QuestJournal_mc.bHideCompleted");
+                        hideCompletedState = hideCompletedQuests.GetBool();
+                    } else {
+                        logger::warn("Couldn't get last displayed quest.");
+                    }
                 }
             }
         }
     }
     return RE::BSEventNotifyControl::kContinue;
-}
-
-void LogTitleListEntries(const RE::GFxValue& entryList) {
-    if (entryList.IsArray()) {
-        for (std::uint32_t i = 0; i < entryList.GetArraySize(); ++i) {
-            logger::info("------ Start of Entry ------");
-            RE::GFxValue entry;
-            entryList.GetElement(i, &entry);
-
-            RE::GFxValue title, description, formID, instance, completed, active, objectives, type, timeIndex, divider;
-
-            if (entry.HasMember("text")) {
-                entry.GetMember("text", &title); 
-                if (title.IsString()) { 
-                    logger::info("Quest Title: {}", title.GetString());
-                }
-            }
-
-            if (entry.HasMember("description")) {
-                entry.GetMember("description", &description); 
-                if (description.IsString()) { 
-                    logger::info("Description: {}", description.GetString());
-                }
-            }
-
-            if (entry.HasMember("formID")) {
-                entry.GetMember("formID", &formID);
-                if (formID.IsNumber()) {
-                    logger::info("Form ID: {}", formID.GetNumber());
-                }
-            }
-
-            if (entry.HasMember("instance")) {
-                entry.GetMember("instance", &instance);
-                if (instance.IsNumber()) {
-                    logger::info("Instance: {}", instance.GetNumber());
-                }
-            }
-
-            if (entry.HasMember("completed")) {
-                entry.GetMember("completed", &completed);
-                if (completed.IsNumber()) {
-                    logger::info("Completed: {}", completed.GetNumber());
-                }
-            }
-
-            if (entry.HasMember("active")) {
-                entry.GetMember("active", &active);
-                if (active.IsBool()) {
-                    logger::info("Active: {}", active.GetBool());
-                }
-            }
-
-            if (entry.HasMember("objectives")) {
-                entry.GetMember("objectives", &objectives);
-                if (objectives.IsArray()) {
-                    logger::info("-------------Objectives: {}", objectives.GetArraySize());
-
-                    for (std::uint32_t i = 0; i < objectives.GetArraySize(); ++i) {
-                        RE::GFxValue objective;
-                        objectives.GetElement(i, &objective);
-                        if (objective.HasMember("text")) {
-                            RE::GFxValue textValue;
-                            objective.GetMember("text", &textValue);
-                            logger::info("[Objective {}] - {}", i, textValue.GetString());
-                        }
-
-                        if (objective.HasMember("formID")) {
-                            RE::GFxValue formIDValue;
-                            objective.GetMember("formID", &formIDValue);
-                            logger::info("formID: {}", formIDValue.GetNumber());
-                        }
-
-                        if (objective.HasMember("instance")) {
-                            RE::GFxValue instanceValue;
-                            objective.GetMember("instance", &instanceValue);
-                            logger::info("instance: {}", instanceValue.GetNumber()); 
-                        }
-
-                        if (objective.HasMember("active")) {
-                            RE::GFxValue activeValue;
-                            objective.GetMember("active", &activeValue);
-                            logger::info("active: {}", activeValue.GetBool()); 
-                        }
-
-                        if (objective.HasMember("completed")) {
-                            RE::GFxValue completedValue; 
-                            objective.GetMember("completed", &completedValue); 
-                            logger::info("completed: {}", completedValue.GetNumber()); 
-                        }
-
-                        if (objective.HasMember("failed")) {
-                            RE::GFxValue failedValue;
-                            objective.GetMember("failed", &failedValue); 
-                            logger::info("failed: {}", failedValue.GetNumber()); 
-                        }
-                    }
-                    logger::info("---------------");
-                }
-            }
-
-            if (entry.HasMember("type")) {
-                entry.GetMember("type", &type);
-                logger::info("Quest Type: {}", type.GetNumber());
-            }
-
-            if (entry.HasMember("timeIndex")) {
-                entry.GetMember("timeIndex", &timeIndex);
-                if (timeIndex.IsNumber()) {
-                    logger::info("Time Index: {}", timeIndex.GetNumber());
-                }
-            }
-
-            if (entry.HasMember("divider")) {
-                entry.GetMember("divider", &divider);
-                if (divider.IsBool()) {
-                    logger::info("Divider: {}", divider.GetBool());
-                }
-            }
-
-            logger::info("------ End of Entry ------");
-        }
-    } else {
-        logger::warn("TitleList entryList is not an array.");
-    }
 }
 
 void GetInGameDate() {

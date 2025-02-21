@@ -242,3 +242,160 @@ std::string ConcatenateViewedQuests(const std::unordered_set<std::string>& quest
 
     return oss.str();
 }
+
+void SetINIValue(const char* settingName, float value) {
+    auto iniSetting = RE::INISettingCollection::GetSingleton()->GetSetting(settingName);
+    if (iniSetting) {
+        iniSetting->data.f = value;
+        RE::INISettingCollection::GetSingleton()->WriteSetting(iniSetting);
+        logger::info("{} INI value set to {}", settingName, value);
+    }
+}
+
+void GetINIValue(const char* settingName) {
+    auto iniSetting = RE::INISettingCollection::GetSingleton()->GetSetting(settingName);
+    if (iniSetting) {
+        logger::info("INI setting value for {} is {}", settingName, iniSetting->GetFloat());
+    }
+}
+
+void LogActiveInputHandlers() {
+    auto menuControls = RE::MenuControls::GetSingleton();
+    if (!menuControls) {
+        logger::error("MenuControls not found!");
+        return;
+    }
+
+    logger::info("Checking active InputHandlers...");
+
+    for (auto& handler : menuControls->handlers) {
+        if (handler) {
+            logger::info("Active InputHandler: {}", typeid(*handler).name());
+        }
+    }
+}
+
+void LogTitleListEntries(const RE::GFxValue& entryList) {
+    if (entryList.IsArray()) {
+        for (std::uint32_t i = 0; i < entryList.GetArraySize(); ++i) {
+            logger::info("------ Start of Entry ------");
+            RE::GFxValue entry;
+            entryList.GetElement(i, &entry);
+
+            RE::GFxValue title, description, formID, instance, completed, active, objectives, type, timeIndex, divider;
+
+            if (entry.HasMember("text")) {
+                entry.GetMember("text", &title);
+                if (title.IsString()) {
+                    logger::info("Quest Title: {}", title.GetString());
+                }
+            }
+
+            if (entry.HasMember("description")) {
+                entry.GetMember("description", &description);
+                if (description.IsString()) {
+                    logger::info("Description: {}", description.GetString());
+                }
+            }
+
+            if (entry.HasMember("formID")) {
+                entry.GetMember("formID", &formID);
+                if (formID.IsNumber()) {
+                    logger::info("Form ID: {}", formID.GetNumber());
+                }
+            }
+
+            if (entry.HasMember("instance")) {
+                entry.GetMember("instance", &instance);
+                if (instance.IsNumber()) {
+                    logger::info("Instance: {}", instance.GetNumber());
+                }
+            }
+
+            if (entry.HasMember("completed")) {
+                entry.GetMember("completed", &completed);
+                if (completed.IsNumber()) {
+                    logger::info("Completed: {}", completed.GetNumber());
+                }
+            }
+
+            if (entry.HasMember("active")) {
+                entry.GetMember("active", &active);
+                if (active.IsBool()) {
+                    logger::info("Active: {}", active.GetBool());
+                }
+            }
+
+            if (entry.HasMember("objectives")) {
+                entry.GetMember("objectives", &objectives);
+                if (objectives.IsArray()) {
+                    logger::info("-------------Objectives: {}", objectives.GetArraySize());
+
+                    for (std::uint32_t i = 0; i < objectives.GetArraySize(); ++i) {
+                        RE::GFxValue objective;
+                        objectives.GetElement(i, &objective);
+                        if (objective.HasMember("text")) {
+                            RE::GFxValue textValue;
+                            objective.GetMember("text", &textValue);
+                            logger::info("[Objective {}] - {}", i, textValue.GetString());
+                        }
+
+                        if (objective.HasMember("formID")) {
+                            RE::GFxValue formIDValue;
+                            objective.GetMember("formID", &formIDValue);
+                            logger::info("formID: {}", formIDValue.GetNumber());
+                        }
+
+                        if (objective.HasMember("instance")) {
+                            RE::GFxValue instanceValue;
+                            objective.GetMember("instance", &instanceValue);
+                            logger::info("instance: {}", instanceValue.GetNumber());
+                        }
+
+                        if (objective.HasMember("active")) {
+                            RE::GFxValue activeValue;
+                            objective.GetMember("active", &activeValue);
+                            logger::info("active: {}", activeValue.GetBool());
+                        }
+
+                        if (objective.HasMember("completed")) {
+                            RE::GFxValue completedValue;
+                            objective.GetMember("completed", &completedValue);
+                            logger::info("completed: {}", completedValue.GetNumber());
+                        }
+
+                        if (objective.HasMember("failed")) {
+                            RE::GFxValue failedValue;
+                            objective.GetMember("failed", &failedValue);
+                            logger::info("failed: {}", failedValue.GetNumber());
+                        }
+                    }
+                    logger::info("---------------");
+                }
+            }
+
+            if (entry.HasMember("type")) {
+                entry.GetMember("type", &type);
+                logger::info("Quest Type: {}", type.GetNumber());
+            }
+
+            if (entry.HasMember("timeIndex")) {
+                entry.GetMember("timeIndex", &timeIndex);
+                if (timeIndex.IsNumber()) {
+                    logger::info("Time Index: {}", timeIndex.GetNumber());
+                }
+            }
+
+            if (entry.HasMember("divider")) {
+                entry.GetMember("divider", &divider);
+                if (divider.IsBool()) {
+                    logger::info("Divider: {}", divider.GetBool());
+                }
+            }
+
+            logger::info("------ End of Entry ------");
+        }
+    } else {
+        logger::warn("TitleList entryList is not an array.");
+    }
+}

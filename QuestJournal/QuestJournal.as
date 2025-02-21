@@ -1,10 +1,12 @@
 ﻿import gfx.managers.FocusHandler;
 import gfx.io.GameDelegate;
 import gfx.ui.InputDetails;
+import Components.CrossPlatformButtons;
 import Shared.GlobalFunc;
 import gfx.ui.NavigationCode;
 import flash.geom.Rectangle;
 import JSON;
+import skse;
 import QuestsPage;
 
 class QuestJournal extends MovieClip
@@ -72,7 +74,9 @@ class QuestJournal extends MovieClip
 
 	var toggleActiveButton:MovieClip;
 	var showMapButton:MovieClip;
+	var showMapText:MovieClip;
 	var showMiscButton:MovieClip;
+	var	showMiscText:MovieClip;
 	var hideCompleteButton:MovieClip;
 
 	var scrollAmount:Number = 40;
@@ -94,6 +98,7 @@ class QuestJournal extends MovieClip
 	var bInitQuestsLoad:Boolean;
 	var aMainIDs = new Array();
 	var aFactionIDs = new Array();
+	var iPlatform;
 
 	function QuestJournal()
 	{
@@ -175,7 +180,19 @@ class QuestJournal extends MovieClip
 			//debugLog("navEquivalent: "+details.navEquivalent);
 			if (details.code == 77 || details.navEquivalent == NavigationCode.GAMEPAD_Y)
 			{
-				GameDelegate.call("ShowQuestOnMap",["PLACEHOLDER"]);
+				if (iFocusState == 0){
+					if (currentQuest.objectives[0].questTargetID == undefined){
+						GameDelegate.call("PlaySound",["UIMenuCancel"]);
+					} else {
+						GameDelegate.call("ShowQuestOnMap",[Number(currentQuest.objectives[0].questTargetID)]);
+					}
+				} else if (iFocusState == 1){
+					if (aMiscQuestClipsContainer[iCurrentMiscQuestIndex].objective.questTargetID == undefined) {
+						GameDelegate.call("PlaySound",["UIMenuCancel"]);
+					} else {
+						GameDelegate.call("ShowQuestOnMap",[Number(aMiscQuestClipsContainer[iCurrentMiscQuestIndex].objective.questTargetID)]);
+					}
+				}
 				bHandledInput = true;
 			}
 			else if ((details.code == 72 || details.navEquivalent == NavigationCode.GAMEPAD_R3) && MiscQuestsScreen._visible == false)
@@ -205,7 +222,14 @@ class QuestJournal extends MovieClip
 				MiscQuestsScreen._visible = true;
 				MiscQuestsOverlayBackground_mc._visible = true;
 				GameDelegate.call("PlaySound",["UIMenuBladeOpenSD"]);
+				showMiscText.text = "$MISC_BUTTON_HIDE";
 				iFocusState = 1;
+				if (iCurrentMiscQuestIndex < aMiscQuestClipsContainer.length){
+					onMiscObjectiveHover(aMiscQuestClipsContainer[iCurrentMiscQuestIndex], aMiscQuestClipsContainer[iCurrentMiscQuestIndex].objective)
+				} else {
+					showMapButton._alpha = 50;
+					showMapText._alpha = 50;
+				}
 				bHandledInput = true;
 			}
 			else if ((details.code == 81 || details.navEquivalent == NavigationCode.GAMEPAD_X) && MiscQuestsScreen._visible == true)
@@ -213,7 +237,22 @@ class QuestJournal extends MovieClip
 				MiscQuestsScreen._visible = false;
 				MiscQuestsOverlayBackground_mc._visible = false;
 				GameDelegate.call("PlaySound",["UIMenuBladeCloseSD"]);
+				showMiscText.text = "$MISC_BUTTON_SHOW";
 				iFocusState = 0;
+				if (currentQuest == {}){
+					showMapButton._alpha = 50;
+					showMapText._alpha = 50;
+				} else if (iCurrentQuestIndex == -1) {
+					if (aQuestClipsContainer[0].quest.objectives[0].questTargetID == undefined){
+						showMapButton._alpha = 50;
+						showMapText._alpha = 50;
+					} else {
+						showMapButton._alpha = 100;
+						showMapText._alpha = 100;
+					}
+				} else {
+					onQuestHover(aQuestClipsContainer[iCurrentQuestIndex],aQuestClipsContainer[iCurrentQuestIndex].quest);
+				}
 				bHandledInput = true;
 			}
 			else if (details.navEquivalent == NavigationCode.UP)
@@ -260,9 +299,9 @@ class QuestJournal extends MovieClip
 				} else if (iFocusState == 1){
 					if (iCurrentMiscQuestIndex > 0){
 						onMiscObjectiveHover(aMiscQuestClipsContainer[iCurrentMiscQuestIndex - 1], aMiscQuestClipsContainer[iCurrentMiscQuestIndex - 1].objective);
-						if (aMiscQuestClipsContainer[iCurrentMiscQuestIndex]._y - MiscObjectivesHolder._y > 440)
+						if (aMiscQuestClipsContainer[iCurrentMiscQuestIndex]._y + MiscObjectivesHolder._y > 155)
 						{
-							MiscObjectivesHolder._y -= 40;
+							MiscObjectivesHolder._y = 155 - aMiscQuestClipsContainer[iCurrentMiscQuestIndex]._y;
 						}
 					}
 				}
@@ -473,11 +512,22 @@ class QuestJournal extends MovieClip
 		QuestDescription.textField.text = quest.description;
 		QuestDescription.textField.textAutoSize = "shrink";
 		GameDelegate.call("RequestQuestLocation",[]);
+		if (quest.location.substr(-8, 8).toUpperCase() == "OBLIVION")
+		{
+			LocationIconLarge_mc.gotoAndStop("realmOblivion");
+		}
 		LocationIconLarge_mc.gotoAndStop(quest.location);
 		SetLocationText(quest.location);
 		TitleKnotwork.gotoAndStop(quest.type);
 		BackgroundKnotwork.gotoAndStop(quest.type);
 		SetObjectives(quest);
+		if (quest.objectives[0].questTargetID == undefined){
+			showMapButton._alpha = 50;
+			showMapText._alpha = 50;
+		} else {
+			showMapButton._alpha = 100;
+			showMapText._alpha = 100;
+		}
 	}
 
 	function onQuestRollOut(questClip:MovieClip, quest:Object)
@@ -782,6 +832,14 @@ class QuestJournal extends MovieClip
 		} else {
 			objectiveClip.ObjectiveStatus.gotoAndStop("miscActiveHighlighted");
 		}
+		
+		if (objective.questTargetID == undefined){
+			showMapButton._alpha = 50;
+			showMapText._alpha = 50;
+		} else {
+			showMapButton._alpha = 100;
+			showMapText._alpha = 100;
+		}
 		objectiveClip.ObjectiveText.textField.textColor = 0xFFFFFF;
 	}
 	
@@ -912,6 +970,12 @@ class QuestJournal extends MovieClip
 			regionString = "$" + county + "_COUNTY";
 			provinceString = "$CYRODIIL";
 		}
+		else if (questLoc.substr(-8, 8) == "OBLIVION")
+		{
+			var plane = questLoc.substr(0, length(questLoc) - 8);
+			regionString = "$" + plane + "_PLANE";
+			provinceString = "$OBLIVION";
+		}
 		else
 		{
 			regionString = "";
@@ -954,6 +1018,11 @@ class QuestJournal extends MovieClip
 			}
 		}
 		return false;
+	}
+	
+	function SetPlatform(a_platform: Number, a_bPS3Switch: Boolean): Void
+	{
+		iPlatform = a_platform;
 	}
 
 	function debugLog(message:Object):Void

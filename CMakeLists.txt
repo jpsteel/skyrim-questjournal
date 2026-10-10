@@ -38,7 +38,10 @@ endif()
 # set(OUTPUT_FOLDER "C:/path/to/any/folder")
 
 # Setup your SKSE plugin as an SKSE plugin!
-find_package(CommonLibSSE CONFIG REQUIRED)
+# CommonLibSSE-NG is a git submodule (lib/commonlibsse-ng) so it can track Skyrim 1.7.x support
+set(BUILD_TESTS OFF CACHE BOOL "Disable CommonLibSSE-NG unit tests" FORCE)
+add_subdirectory(lib/commonlibsse-ng CommonLibSSE EXCLUDE_FROM_ALL)
+include(lib/commonlibsse-ng/cmake/CommonLibSSE.cmake) # provides add_commonlibsse_plugin()
 add_commonlibsse_plugin(${PROJECT_NAME} SOURCES src/main.cpp
     src/EventProcessor.cpp
     src/Utility.cpp
